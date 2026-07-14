@@ -1,0 +1,31 @@
+# python
+__pycache__/
+*.pyc
+
+# datasets (not distributed with this repo)
+MWD/
+ACDC/
+data/
+datasets/
+MWD/**/*.jpg
+MWD/**/*.png
+ACDC/**/*.jpg
+ACDC/**/*.png
+data/**/*.jpg
+data/**/*.png
+datasets/**/*.jpg
+datasets/**/*.png
+
+# latex build artefacts
+*.aux
+*.log
+*.blg
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# assistant scratch
+CLAUDE.md
+AGENTS.md
+.claude/
