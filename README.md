@@ -1,4 +1,4 @@
-# Weather Image Classification with Engineered Features and SVM
+![Weather Classification with Engineered Features and SVM. 96.04% on MWD, and the descriptor transfers to ACDC at 90.6%.](assets/banner.svg)
 
 > **96.04% test accuracy on the Multi-class Weather Dataset from hand-engineered colour and edge features fed to an SVM, with no deep learning anywhere in the pipeline. The fitted PCA and SVC ship in `models/`, so the result is loadable, not just reported.**
 
