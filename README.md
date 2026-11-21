@@ -22,37 +22,25 @@ Tells cloudy, rain, shine and sunrise apart in one photo, with hand-built colour
 
 *The shipped model on MWD: 100% on the 845 training images, 96.04% on the 278 test images. Sunrise is classified perfectly, 89 out of 89.*
 
-## Run it
-
-These three commands classify a photo of your own. They load the fitted PCA and SVC from `models/` and need no dataset.
-
-```bash
-git clone https://github.com/artaeun/weather-classification-svm && cd weather-classification-svm
-pip install -r requirements.txt
-python classify.py your_photo.jpg
-```
-
-`classify.py` prints one of cloudy, rain, shine or sunrise. [Reproduce](#reproduce) explains the scikit-learn pin and the retraining notebook.
-
 ## Abstract
 
 A single still image is assigned one of four weather conditions (cloudy, rain, shine, sunrise) using a 1562-dimensional descriptor built by hand from BGR histograms, per-channel contrast, k-means dominant colours, and the HSV histograms of a Difference-of-Gaussian version of the image. PCA reduces the descriptor to 200 components, and a grid-searched SVC does the classification. On the Multi-class Weather Dataset (MWD) the model reaches 96.04% on the held-out test split, 267 correct out of 278. The same feature design, with the classifier refit on that dataset's own training split, reaches 90.6% on ACDC, a five-class driving dataset shot in adverse conditions. The fitted PCA and SVC are serialised in `models/`.
 
 ## Problem
 
-Weather has no shape. There is no object to localise and no bounding box to regress, and a rainy street contains the same buildings, the same road and the same sky as a cloudy one. The classes differ only in the statistics of the light, so the design question is which measurable image property separates them.
+Weather has no shape, so there is no object to localise and no bounding box to regress. A rainy street contains the same buildings, the same road and the same sky as a cloudy one. The classes differ only in the statistics of the light, so the design question is which measurable image property separates them.
 
 For the four MWD classes, colour is a plausible answer. Sunrise is warm and low-saturation-blue. Shine has a saturated blue sky and high contrast. Cloudy collapses into a narrow band of grey. A global colour histogram should therefore carry most of the discriminative signal, and the results below say it does.
 
-That answer is fragile in a specific way. It works because the MWD classes happen to differ in colour. Rain is already the hard class inside MWD, since a rainy scene with no visible precipitation streaks has, statistically, a cloudy histogram. Push the same idea onto classes that do not differ in colour, and it has nothing left to measure. The ACDC experiment is there to price that failure.
+That answer holds only because the MWD classes happen to differ in colour. Rain is already the hard class inside MWD, since a rainy scene with no visible precipitation streaks has, statistically, a cloudy histogram. On classes that do not differ in colour, the same idea has nothing to measure. The ACDC experiment measures how much is lost when that happens.
 
 ## Motivation
 
-Two things made this worth building.
+I built this for two reasons.
 
 First, a 200-component descriptor and an off-the-shelf SVM get to 96% on a task that people routinely reach for a CNN to solve. Knowing where the classical floor sits is useful before committing a GPU budget, and feature extraction over the whole MWD training split takes 53.75 seconds on a CPU.
 
-Second, feature selection was run against the test split. Every candidate feature was added, the model refit, the test score written down, and the feature kept or dropped on that number. A score obtained that way is contaminated, and reporting it alone would say nothing about whether the features mean anything outside this dataset. So the descriptor was carried to ACDC, unchanged, and re-evaluated there. That transfer is the honest part of the project, and it is what the Discussion section is about.
+Second, feature selection was run against the test split. Every candidate feature was added, the model refit, the test score written down, and the feature kept or dropped on that number. A score obtained that way is contaminated, and reporting it alone would say nothing about whether the features mean anything outside this dataset. So the descriptor was carried to ACDC, unchanged, and re-evaluated there. The Discussion section is about that transfer.
 
 ## Approach
 
@@ -82,7 +70,7 @@ Adding more features made the model worse. Average colour, dropped on top of his
 | **Total** | **1562** |
 | **After PCA** | **200** |
 
-The Difference of Gaussian is computed on the colour image rather than a greyscale one, because greyscaling would throw away exactly the information the rest of the pipeline runs on. Dominant colours come from k-means with k = 6 on a 100x100 nearest-neighbour downsample, which is what makes the extraction affordable across the dataset (53.75 seconds for the 845 training images).
+The Difference of Gaussian is computed on the colour image, because a greyscale version would discard the colour information that the rest of the pipeline uses. Dominant colours come from k-means with k = 6 on a 100x100 nearest-neighbour downsample, which is what makes the extraction affordable across the dataset (53.75 seconds for the 845 training images).
 
 ```python
 def get_picture_color_features(picture):
@@ -116,7 +104,7 @@ def get_picture_color_features(picture):
 | MWD | 4 (cloudy, rain, shine, sunrise) | 845 | 278 | 100% | **96.04%** |
 | ACDC | 5 (clear, fog, night, rain, snow) | 1000 | 500 | 100% | **90.6%** |
 
-**MWD: 267 correct out of 278.** Eleven errors. Four are cloudy against rain in both directions, five involve shine, and the sunrise row of the confusion matrix is 89 correct and 0 wrong. The model never misses a sunrise. The errors that remain fall exactly where the colour overlap predicts they would.
+**MWD: 267 correct out of 278.** Eleven errors. Four are cloudy against rain in both directions, five involve shine, and the sunrise row of the confusion matrix is 89 correct and 0 wrong. The errors that remain fall where the colour overlap predicts them.
 
 ![Correctly classified MWD test images, one per class](assets/mwd-correct-classifications.png)
 
@@ -140,19 +128,19 @@ def get_picture_color_features(picture):
 
 *The ACDC error modes: fog read as snow, night read as rain, rain read as night, snow read as rain. There is no clear panel, because the model made zero errors on clear.*
 
-**Run-to-run variance.** The 96.04% belongs to the serialised model in `models/`. A clean refit of the notebook lands around 94.6%, because the dominant colour extraction calls `cv.kmeans` with `KMEANS_RANDOM_CENTERS` and no seed. 18 of the 1562 descriptor dimensions are therefore stochastic, and they move the fitted decision boundary between runs. The gap is a property of the pipeline, and it is described in Limitations rather than smoothed over.
+**Run-to-run variance.** The 96.04% belongs to the serialised model in `models/`. A clean refit of the notebook lands around 94.6%, because the dominant colour extraction calls `cv.kmeans` with `KMEANS_RANDOM_CENTERS` and no seed. 18 of the 1562 descriptor dimensions are therefore stochastic, and they move the fitted decision boundary between runs. The gap is a property of the pipeline, and Limitations describes it.
 
 ## Discussion
 
-The ACDC number needs a precise reading, because the obvious reading is wrong.
+The 90.6% on ACDC is easy to misread as the MWD classifier generalising.
 
-ACDC has a different class set from MWD: clear, fog, night, rain, snow, against MWD's cloudy, rain, shine, sunrise. The MWD classifier cannot be scored on ACDC images at all, since three of the five labels do not exist in its output space. So the PCA and the SVC were **refit from scratch on ACDC's own training split**, and only the feature design carried over. Calling that "generalisation without retraining" would be a lie about what happened.
+ACDC has a different class set from MWD: clear, fog, night, rain, snow, against MWD's cloudy, rain, shine, sunrise. The MWD classifier cannot be scored on ACDC images at all, since three of the five labels do not exist in its output space. So the PCA and the SVC were **refit from scratch on ACDC's own training split**, and only the feature design carried over. The classifier was retrained, so this is a transfer of the feature design alone.
 
-What the 90.6% does measure is the worth of a feature set designed on one dataset when it is applied to another. The descriptor was tuned, iteration by iteration, against MWD's test split, on four classes photographed by many different cameras in many different places. ACDC is dashcam footage from a single vehicle in Switzerland, five classes, none of which the descriptor was designed to separate. Dropping that descriptor into the new problem, with no new features and no redesign, still supports 90.6%, and the per-class breakdown says exactly where the design is load-bearing and where it runs out.
+The 90.6% measures how well a feature set designed on one dataset works when it is applied to another. The descriptor was tuned, iteration by iteration, against MWD's test split, on four classes photographed by many different cameras in many different places. ACDC is dashcam footage from a single vehicle in Switzerland, five classes, none of which the descriptor was designed to separate. With no new features and no redesign, that descriptor still reaches 90.6% on the new problem, and the per-class breakdown shows which classes it separates and which it cannot.
 
-It runs out precisely where colour stops discriminating. Clear and night are free, because global lightness separates them from everything else and from each other. Fog holds up at 95%, because a fog histogram is genuinely distinctive: everything collapses towards a single grey mode. Rain and snow are where the design fails, and it fails for a reason that is visible in the descriptor itself. A global histogram discards spatial location, and the whole difference between a rainy road and a snowy road is on the ground, under a sky that looks the same in both. Averaging the image into one histogram destroys that distinction before the classifier ever sees it.
+The design fails on the classes that colour does not separate. Clear and night are free, because global lightness separates them from everything else and from each other. Fog holds up at 95%, because a fog histogram is distinctive: everything collapses towards a single grey mode. Rain and snow are where the design fails, and the descriptor itself shows the reason. A global histogram discards spatial location, and the whole difference between a rainy road and a snowy road is on the ground, under a sky that looks the same in both. Averaging the image into one histogram destroys that distinction before the classifier ever sees it.
 
-The obvious next step follows from that sentence. Segment ground from sky, run the same colour analysis per region, and the rain against snow distinction becomes available. Snow ground is white and rain ground is not.
+The next step follows from that. Segment ground from sky, run the same colour analysis per region, and the rain against snow distinction becomes available. Snow ground is white and rain ground is not.
 
 ## Limitations
 
@@ -164,18 +152,11 @@ The obvious next step follows from that sentence. Segment ground from sky, run t
 
 **The datasets are not in this repository.** MWD is roughly 96 MB and ACDC is larger, so both are linked rather than vendored. Retraining requires downloading them. The shipped `.pkl` files exist to make inference possible without that.
 
-**Global histograms throw away location.** Stated above, repeated here because it is the single structural limit of the design and the thing that would need to change first.
-
-## Next steps
-
-- Seed the dominant-colour k-means and refit. Nothing else in the pipeline is random.
-- Fine-tune a small CNN on the same MWD split and put it in the results table beside the SVM, with accuracy and CPU time per image.
-- Segment ground from sky and compute the colour features of each region. On ACDC, rain and snow images differ on the ground.
-- Select features on a validation split carved from the training images, and keep the MWD test images out of feature selection.
+**Global histograms throw away location.** This is the single structural limit of the design and the first thing that would need to change.
 
 ## Reproduce
 
-**The fitted models ship with the repository.** `models/pca_weatherClassification.pkl` and `models/svc_weatherClassification.pkl` are the exact PCA and grid-searched SVC behind the 96.04% number. You can classify an image with them right now: no 96 MB dataset download, no refit, no grid search.
+**The fitted models ship with the repository.** `models/pca_weatherClassification.pkl` and `models/svc_weatherClassification.pkl` are the exact PCA and grid-searched SVC behind the 96.04% number. They classify an image without the 96 MB dataset download and without a refit.
 
 ```bash
 pip install -r requirements.txt
@@ -224,7 +205,7 @@ image = cv.imread("your_image.jpg")
 print(svc.predict(pca.transform([features(image)]))[0])      # cloudy | rain | shine | sunrise
 ```
 
-**The scikit-learn pin is load-bearing.** Both `.pkl` files were serialised with scikit-learn 1.3.2, and that is what `requirements.txt` pins. A newer scikit-learn will still unpickle them, but it raises `InconsistentVersionWarning` and gives no guarantee that the loaded estimator behaves as it did when it was fitted. Install the pinned version if you want the 96.04% model to be the model you are actually running.
+**The shipped models need the pinned scikit-learn.** Both `.pkl` files were serialised with scikit-learn 1.3.2, and that is what `requirements.txt` pins. A newer scikit-learn will still unpickle them, but it raises `InconsistentVersionWarning` and gives no guarantee that the loaded estimator behaves as it did when it was fitted. Install the pinned version if you want the 96.04% model to be the model you are running.
 
 **To retrain.** `notebooks/FinalProject.ipynb` runs the whole thing end to end, with its saved outputs intact. It expects the dataset in an `MWD/` folder next to the notebook, split into `train/` and `test/` subfolders by class. Setting `use_pre_storedSVCPCA = 1` in section 1.3 makes the notebook load the shipped `.pkl` files instead of refitting and re-running the grid search. Remember that a refit will not land on 96.04% exactly, for the unseeded k-means reason given above.
 
