@@ -1,6 +1,13 @@
 ![Weather Classification with Engineered Features and SVM. 96.04% on MWD, and the descriptor transfers to ACDC at 90.6%.](assets/banner.svg)
 
-> **96.04% test accuracy on the Multi-class Weather Dataset from hand-engineered colour and edge features fed to an SVM, with no deep learning anywhere in the pipeline. The fitted PCA and SVC ship in `models/`, so the result is loadable, not just reported.**
+Tells cloudy, rain, shine and sunrise apart in one photo, with hand-built colour features and an SVM.
+
+| Result | Value |
+| --- | --- |
+| Test accuracy, Multi-class Weather Dataset (4 classes) | 96.04 % (267 of 278) |
+| Test accuracy, ACDC (5 classes), same features, classifier refit | 90.6 % (453 of 500) |
+| Features per image, before and after PCA | 1562, then 200 |
+| Feature extraction for the 845 training images, on a CPU | 53.75 s |
 
 ![Python](https://img.shields.io/badge/Python-3.11.7-3776AB?style=flat&logo=python&logoColor=white)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3.2-F7931E?style=flat&logo=scikitlearn&logoColor=white)
@@ -14,6 +21,18 @@
 ![Confusion matrices for the shipped model on MWD, training split and test split](assets/confusion-matrix-mwd.png)
 
 *The shipped model on MWD: 100% on the 845 training images, 96.04% on the 278 test images. Sunrise is classified perfectly, 89 out of 89.*
+
+## Run it
+
+These three commands classify a photo of your own. They load the fitted PCA and SVC from `models/` and need no dataset.
+
+```bash
+git clone https://github.com/artaeun/weather-classification-svm && cd weather-classification-svm
+pip install -r requirements.txt
+python classify.py your_photo.jpg
+```
+
+`classify.py` prints one of cloudy, rain, shine or sunrise. [Reproduce](#reproduce) explains the scikit-learn pin and the retraining notebook.
 
 ## Abstract
 
@@ -146,6 +165,13 @@ The obvious next step follows from that sentence. Segment ground from sky, run t
 **The datasets are not in this repository.** MWD is roughly 96 MB and ACDC is larger, so both are linked rather than vendored. Retraining requires downloading them. The shipped `.pkl` files exist to make inference possible without that.
 
 **Global histograms throw away location.** Stated above, repeated here because it is the single structural limit of the design and the thing that would need to change first.
+
+## Next steps
+
+- Seed the dominant-colour k-means and refit. Nothing else in the pipeline is random.
+- Fine-tune a small CNN on the same MWD split and put it in the results table beside the SVM, with accuracy and CPU time per image.
+- Segment ground from sky and compute the colour features of each region. On ACDC, rain and snow images differ on the ground.
+- Select features on a validation split carved from the training images, and keep the MWD test images out of feature selection.
 
 ## Reproduce
 
