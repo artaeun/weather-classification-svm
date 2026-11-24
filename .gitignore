@@ -24,8 +24,3 @@ datasets/**/*.png
 *.synctex.gz
 *.fdb_latexmk
 *.fls
-
-# assistant scratch
-CLAUDE.md
-AGENTS.md
-.claude/
